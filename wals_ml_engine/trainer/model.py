@@ -21,6 +21,7 @@ import pandas as pd
 from scipy.sparse import coo_matrix
 import sh
 import tensorflow as tf
+from tensorflow.python.lib.io import file_io
 
 import wals
 
@@ -105,57 +106,57 @@ def _ratings_train_and_test(use_headers, delimiter, input_file):
   """
   headers = ['user_id', 'item_id', 'rating', 'timestamp']
   header_row = 0 if use_headers else None
-  ratings_df = pd.read_csv(input_file,
-                           sep=delimiter,
-                           names=headers,
-                           header=header_row,
-                           dtype={
+  with file_io.FileIO(input_file, mode ='r') as f:
+    ratings_df = pd.read_csv(f,
+                             sep=delimiter,
+                             names=headers,
+                             header=header_row,
+                             dtype={
                                'user_id': np.int32,
                                'item_id': np.int32,
                                'rating': np.float32,
                                'timestamp': np.int32,
                            })
 
-  np_users = ratings_df.user_id.as_matrix()
-  np_items = ratings_df.item_id.as_matrix()
-  unique_users = np.unique(np_users)
-  unique_items = np.unique(np_items)
+    np_users = ratings_df.user_id.as_matrix()
+    np_items = ratings_df.item_id.as_matrix()
+    unique_users = np.unique(np_users)
+    unique_items = np.unique(np_items)
 
-  n_users = unique_users.shape[0]
-  n_items = unique_items.shape[0]
+    n_users = unique_users.shape[0]
+    n_items = unique_items.shape[0]
 
-  # make indexes for users and items if necessary
-  max_user = unique_users[-1]
-  max_item = unique_items[-1]
-  if n_users != max_user or n_items != max_item:
-    # make an array of 0-indexed unique user ids corresponding to the dataset
-    # stack of user ids
-    z = np.zeros(max_user+1, dtype=int)
-    z[unique_users] = np.arange(n_users)
-    u_r = z[np_users]
+    # make indexes for users and items if necessary
+    max_user = unique_users[-1]
+    max_item = unique_items[-1]
+    if n_users != max_user or n_items != max_item:
+      # make an array of 0-indexed unique user ids corresponding to the dataset
+      # stack of user ids
+      z = np.zeros(max_user+1, dtype=int)
+      z[unique_users] = np.arange(n_users)
+      u_r = z[np_users]
 
-    # make an array of 0-indexed unique item ids corresponding to the dataset
-    # stack of item ids
-    z = np.zeros(max_item+1, dtype=int)
-    z[unique_items] = np.arange(n_items)
-    i_r = z[np_items]
+      # make an array of 0-indexed unique item ids corresponding to the dataset
+      # stack of item ids
+      z = np.zeros(max_item+1, dtype=int)
+      z[unique_items] = np.arange(n_items)
+      i_r = z[np_items]
 
-    # construct the ratings set from the three stacks
-    np_ratings = ratings_df.rating.as_matrix()
-    ratings = np.zeros((np_ratings.shape[0], 3), dtype=object)
-    ratings[:, 0] = u_r
-    ratings[:, 1] = i_r
-    ratings[:, 2] = np_ratings
-  else:
-    ratings = ratings_df.as_matrix(['user_id', 'item_id', 'rating'])
-    # deal with 1-based user indices
-    ratings[:, 0] -= 1
-    ratings[:, 1] -= 1
+      # construct the ratings set from the three stacks
+      np_ratings = ratings_df.rating.as_matrix()
+      ratings = np.zeros((np_ratings.shape[0], 3), dtype=object)
+      ratings[:, 0] = u_r
+      ratings[:, 1] = i_r
+      ratings[:, 2] = np_ratings
+    else:
+      ratings = ratings_df.as_matrix(['user_id', 'item_id', 'rating'])
+      # deal with 1-based user indices
+      ratings[:, 0] -= 1
+      ratings[:, 1] -= 1
 
-  tr_sparse, test_sparse = _create_sparse_train_and_test(ratings,
-                                                         n_users, n_items)
+    tr_sparse, test_sparse = _create_sparse_train_and_test(ratings, n_users, n_items)
 
-  return ratings[:, 0], ratings[:, 1], tr_sparse, test_sparse
+    return ratings[:, 0], ratings[:, 1], tr_sparse, test_sparse
 
 
 def _page_views_train_and_test(input_file):
